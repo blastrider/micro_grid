@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    name: Build / Lint / Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache cargo registry, git and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install Rust (stable)
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Add rustfmt & clippy components
+        run: rustup component add rustfmt clippy
+
+      - name: Ensure make is available
+        run: make --version
+
+      - name: Format (Makefile -> cargo fmt)
+        run: make fmt
+
+      - name: Lint (clippy) via Makefile
+        # make lint calls `cargo clippy --features cli -- -D warnings`
+        run: make lint
+
+      - name: Run tests via Makefile
+        # make test calls `cargo test --features cli`
+        run: make test
+
+      - name: Show target size (diagnostic)
+        if: success()
+        run: du -sh target || true
